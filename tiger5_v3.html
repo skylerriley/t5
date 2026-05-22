@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Tiger 5 Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --g900:#0d2b1a;--g800:#163f29;--g700:#1e5c3a;--g600:#2a7a4f;--g400:#4da87a;
+  --g100:#d6ede2;--g50:#f0f8f4;
+  --gold:#b8922a;--gold-l:#d4aa4a;
+  --red:#c0392b;--red-pale:#fdf0ef;
+  --amber:#c8740a;--amber-pale:#fef6ec;
+  --blue:#1a6ea8;
+  --bg:#f2f5f3;--card:#fff;
+  --border:#e0e8e4;--border-mid:#c4d4cc;
+  --text:#111c16;--text2:#3d5248;--text3:#7a9088;
+  --r:14px;--rsm:10px;
+  --sh:0 2px 12px rgba(0,0,0,0.07),0 1px 3px rgba(0,0,0,0.04);
+  --shsm:0 1px 4px rgba(0,0,0,0.06);
+}
+html{font-size:16px;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans-serif;min-height:100vh;overscroll-behavior:none}
+
+/* ── STICKY CHROME (ticker + header + top-nav + gfilter all sticky together) ── */
+.sticky-chrome{position:sticky;top:0;z-index:200}
+
+/* ── TICKER ── */
+.ticker{background:var(--g900);overflow:hidden;height:38px;display:flex;align-items:center}
+.ticker-inner{display:flex;align-items:center;width:max-content;animation:scroll 60s linear infinite}
+.ticker-inner:hover{animation-play-state:paused}
+@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.t-item{display:flex;align-items:center;gap:10px;padding:0 20px;border-right:1px solid rgba(255,255,255,0.08);white-space:nowrap}
+.t-course{font-size:12px;font-weight:700;color:rgba(255,255,255,0.88);max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.t-score{font-size:13px;font-weight:800}
+.t-par{font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px}
+.t-date{font-size:10px;color:rgba(255,255,255,0.3)}
+
+/* ── HEADER ── */
+.hdr{background:var(--g800);padding:0 16px;box-shadow:0 1px 0 rgba(255,255,255,0.06)}
+.hdr-top{display:flex;align-items:center;justify-content:space-between;height:52px}
+.hdr-brand{display:flex;align-items:center;gap:10px}
+.brand-name{font-size:19px;font-weight:800;color:#fff;letter-spacing:-0.01em;line-height:1}
+.brand-tag{font-size:9px;color:rgba(255,255,255,0.38);letter-spacing:0.12em;text-transform:uppercase;margin-top:1px}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.btn-refresh{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);color:#fff;font-size:11px;font-weight:700;font-family:inherit;padding:5px 12px;border-radius:20px;cursor:pointer;transition:background 0.15s}
+.btn-refresh:hover{background:rgba(255,255,255,0.2)}
+.live-badge{display:flex;align-items:center;gap:5px;font-size:10px;color:rgba(255,255,255,0.38)}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#4cde8e;animation:blink 2.5s infinite;flex-shrink:0}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ── DESKTOP NAV (hidden on mobile) ── */
+.desktop-nav{display:none}
+@media(min-width:768px){
+  .desktop-nav{display:flex;gap:0;padding:0 8px}
+  .dnav-btn{background:none;border:none;font-family:inherit;font-size:11px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:rgba(255,255,255,0.45);padding:12px 14px;cursor:pointer;border-bottom:2.5px solid transparent;transition:all 0.15s;white-space:nowrap}
+  .dnav-btn:hover{color:rgba(255,255,255,0.85)}
+  .dnav-btn.active{color:#fff;border-bottom-color:#4cde8e}
+  .mobile-nav{display:none !important}
+}
+
+/* ── MOBILE TOP NAV (hidden on desktop) ── */
+.mobile-nav{background:var(--g800);display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;border-top:1px solid rgba(255,255,255,0.06)}
+.mobile-nav::-webkit-scrollbar{display:none}
+.mnav-btn{flex:0 0 auto;background:none;border:none;color:rgba(255,255,255,0.38);font-family:inherit;font-size:9px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;padding:9px 16px 10px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all 0.15s;border-bottom:2.5px solid transparent;white-space:nowrap;-webkit-tap-highlight-color:transparent;min-width:64px}
+.mnav-btn.active{color:#4cde8e;border-bottom-color:#4cde8e}
+.mnav-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* ── GLOBAL FILTER BAR ── */
+.gfilter{background:var(--g800);padding:10px 16px 12px;border-top:1px solid rgba(255,255,255,0.05)}
+.gfilter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.gf-group{display:flex;flex-direction:column;gap:3px;flex:1;min-width:90px}
+.gf-label{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.32)}
+.gf-select{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.13);border-radius:var(--rsm);padding:7px 26px 7px 9px;font-family:inherit;font-size:12px;font-weight:600;color:#fff;cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(255,255,255,0.35)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;transition:all 0.15s;width:100%}
+.gf-select:focus{outline:none;border-color:rgba(76,222,142,0.5)}
+.gf-select.gf-active{border-color:#4cde8e;background-color:rgba(76,222,142,0.1);color:#4cde8e}
+.gf-select option{background:#163f29;color:#fff}
+.gf-clear{background:rgba(192,57,43,0.18);border:1px solid rgba(192,57,43,0.35);color:#ff8877;font-family:inherit;font-size:11px;font-weight:700;padding:7px 12px;border-radius:var(--rsm);cursor:pointer;align-self:flex-end;white-space:nowrap;transition:all 0.15s}
+.gf-clear:hover{background:rgba(192,57,43,0.3)}
+.gf-clear.hidden{display:none}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.filter-chips:empty{display:none}
+.fchip{display:inline-flex;align-items:center;gap:4px;background:rgba(76,222,142,0.1);border:1px solid rgba(76,222,142,0.22);color:#4cde8e;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px}
+.fchip-x{background:none;border:none;cursor:pointer;color:rgba(76,222,142,0.55);font-size:13px;line-height:1;padding:0;margin-left:1px}
+.fchip-x:hover{color:#ff8877}
+
+/* ── HERO (overview only) ── */
+.hero{background:linear-gradient(160deg,var(--g900) 0%,var(--g800) 100%);padding:16px 16px 20px}
+.hero-lbl{font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.28);margin-bottom:10px;text-align:center}
+.hero-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+@media(min-width:600px){.hero-grid{grid-template-columns:repeat(6,1fr)}}
+.hcell{background:rgba(255,255,255,0.06);border-radius:var(--rsm);padding:10px 6px;text-align:center}
+.hcell-lbl{font-size:9px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:rgba(255,255,255,0.32);margin-bottom:4px}
+.hcell-val{font-size:22px;font-weight:800;color:#fff;line-height:1;letter-spacing:-0.02em}
+.hcell-sub{font-size:9px;color:rgba(255,255,255,0.26);margin-top:2px}
+.hcell.accent .hcell-val{color:#4cde8e}
+.hcell.gold .hcell-val{color:var(--gold-l)}
+
+/* ── CONTENT AREA ── */
+.content{padding:14px 14px 28px;max-width:1200px;margin:0 auto}
+@media(min-width:768px){.content{padding:22px 26px 36px}}
+.tab-panel{display:none}.tab-panel.active{display:block}
+
+/* ── SECTION HEADS ── */
+.sec{display:flex;align-items:center;gap:10px;margin-bottom:14px;margin-top:6px}
+.sec-title{font-size:16px;font-weight:800;color:var(--g800);letter-spacing:-0.01em}
+.sec-rule{flex:1;height:1px;background:var(--border)}
+.sec-badge{background:var(--g50);color:var(--g700);font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px}
+
+/* ── CARDS ── */
+.cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+@media(min-width:600px){.cards-grid{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:900px){.cards-grid.wide{grid-template-columns:repeat(5,1fr)}}
+.card{background:var(--card);border-radius:var(--r);padding:14px 15px;box-shadow:var(--sh);border:1px solid var(--border)}
+.card-label{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.card-value{font-size:26px;font-weight:800;color:var(--g800);line-height:1;margin-bottom:3px;letter-spacing:-0.02em}
+.card-sub{font-size:11px;color:var(--text3)}
+.card.gc{border-top:3px solid var(--g600)}
+.card.gd{border-top:3px solid var(--gold)}.card.gd .card-value{color:var(--gold)}
+
+/* ── CHART CARDS ── */
+.cw{background:var(--card);border-radius:var(--r);padding:16px;box-shadow:var(--sh);border:1px solid var(--border);margin-bottom:14px}
+.ct{font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text3);margin-bottom:14px}
+.ch2{display:grid;grid-template-columns:1fr;gap:14px;margin-bottom:14px}
+@media(min-width:720px){.ch2{grid-template-columns:1fr 1fr}}
+
+/* ── INSIGHTS ── */
+.ig{display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:20px}
+@media(min-width:600px){.ig{grid-template-columns:1fr 1fr}}
+.ins{background:var(--card);border-radius:var(--r);padding:14px 15px;box-shadow:var(--shsm);border:1px solid var(--border);border-left:4px solid var(--g600)}
+.ins.warn{border-left-color:var(--amber)}.ins.bad{border-left-color:var(--red)}.ins.good{border-left-color:var(--g400)}
+.ins-t{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+.ins-b{font-size:12px;color:var(--text2);line-height:1.55}
+
+/* ── ERROR BARS ── */
+.ebars{display:flex;flex-direction:column;gap:12px}
+.erow{display:flex;align-items:center;gap:10px}
+.ename{font-size:12px;color:var(--text2);width:130px;flex-shrink:0}
+.etrack{flex:1;background:var(--g50);border-radius:99px;height:9px;overflow:hidden}
+.efill{height:100%;border-radius:99px;transition:width 0.5s ease}
+.ecorr{font-size:10px;color:var(--text3);width:46px;text-align:right}
+
+/* ── GIR CARDS ── */
+.gg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.gc-card{background:var(--card);border-radius:var(--r);padding:14px 12px;text-align:center;box-shadow:var(--sh);border:1px solid var(--border)}
+.gc-club{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);margin-bottom:6px}
+.gc-pct{font-size:32px;font-weight:800;line-height:1;margin-bottom:3px;letter-spacing:-0.02em}
+.gc-det{font-size:10px;color:var(--text3)}
+.gc-bar-o{background:var(--g50);border-radius:99px;height:5px;margin-top:10px;overflow:hidden}
+.gc-bar-i{height:100%;border-radius:99px;transition:width 0.5s}
+
+/* ── TABLE ── */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r);box-shadow:var(--sh);border:1px solid var(--border);margin-bottom:14px}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl thead tr{background:var(--g800)}
+.tbl thead th{color:rgba(255,255,255,0.6);font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;padding:10px;text-align:left;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.06)}
+.tbl thead th:last-child{border-right:none}
+.tbl thead th.r{text-align:right}
+.tbl tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+.tbl tbody tr:last-child{border-bottom:none}
+.tbl tbody tr:hover{background:var(--g50)}
+.tbl td{padding:9px 10px;color:var(--text2);border-right:1px solid var(--border);white-space:nowrap}
+.tbl td:last-child{border-right:none}
+.tbl td.r{text-align:right}
+.tbl td.dim{color:var(--text3);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.sc-great{color:var(--red);font-weight:800;font-size:14px}
+.sc-good{color:var(--g700);font-weight:800;font-size:14px}
+.sc-avg{color:var(--text);font-weight:600;font-size:14px}
+.sc-bad{color:var(--text3);font-size:13px}
+.hi-r{color:var(--red);font-weight:700}
+.hi-a{color:var(--amber);font-weight:600}
+
+/* ── COURSE TABLE ── */
+.course-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+@media(min-width:600px){.course-grid{grid-template-columns:repeat(4,1fr)}}
+.ctbl{width:100%;border-collapse:collapse;font-size:12px}
+.ctbl thead tr{background:var(--g50)}
+.ctbl thead th{color:var(--text3);font-size:9px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;padding:9px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.ctbl thead th.r{text-align:right}
+.ctbl tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+.ctbl tbody tr:last-child{border-bottom:none}
+.ctbl tbody tr:hover{background:var(--g50)}
+.ctbl td{padding:8px 10px;color:var(--text2);white-space:nowrap}
+.ctbl td.r{text-align:right}
+.ctbl td.cname{font-weight:600;color:var(--text);max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.rank-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--g700);color:#fff;font-size:9px;font-weight:800}
+
+/* ── LOCAL FILTER (scorecard tab) ── */
+.lfilter{background:var(--card);border-radius:var(--r);border:1px solid var(--border);padding:12px 14px;margin-bottom:12px;box-shadow:var(--shsm)}
+.lf-row{display:flex;flex-wrap:wrap;gap:8px}
+.lf-group{display:flex;flex-direction:column;gap:3px;flex:1;min-width:110px}
+.lf-label{font-size:9px;font-weight:700;letter-spacing:0.09em;text-transform:uppercase;color:var(--text3)}
+.lf-select{background:var(--bg);border:1px solid var(--border-mid);border-radius:var(--rsm);padding:7px 24px 7px 9px;font-family:inherit;font-size:12px;font-weight:600;color:var(--text);cursor:pointer;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237a9088' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;width:100%;transition:all 0.15s}
+.lf-select:focus{outline:none;border-color:var(--g600)}
+.lf-select.af{border-color:var(--g600);background-color:var(--g50);color:var(--g700)}
+.range-row{display:flex;align-items:center;gap:6px;margin-top:2px}
+.range-input{flex:1;accent-color:var(--g700)}
+.rval{font-size:11px;font-weight:700;color:var(--g700);min-width:24px;text-align:center}
+
+/* ── MONTHLY ── */
+.mg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+@media(min-width:500px){.mg{grid-template-columns:repeat(4,1fr)}}
+@media(min-width:768px){.mg{grid-template-columns:repeat(6,1fr)}}
+.mc{background:var(--card);border-radius:var(--rsm);padding:11px 10px;text-align:center;box-shadow:var(--shsm);border:1px solid var(--border)}
+.mc-mo{font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);margin-bottom:5px}
+.mc-sc{font-size:20px;font-weight:800;line-height:1;letter-spacing:-0.02em}
+.mc-ct{font-size:9px;color:var(--text3);margin-top:2px}
+.mca{color:var(--red)}.mcb{color:var(--g700)}.mcc{color:var(--text)}.mcd{color:var(--text3)}
+.mo-stat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+@media(min-width:600px){.mo-stat-grid{grid-template-columns:repeat(4,1fr)}}
+
+/* ── LEGEND ── */
+.lgnd{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px}
+.lg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.lg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+
+/* ── LOADING / ERROR ── */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;gap:16px}
+.spinner{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--g700);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-txt{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3)}
+.err-card{background:#fff;border-radius:var(--r);border-left:4px solid var(--red);padding:14px 16px;color:var(--red);font-size:13px;box-shadow:var(--shsm);margin:14px 0}
+.err-card small{color:var(--text3);font-size:11px;display:block;margin-top:4px;line-height:1.5}
+.no-res{padding:32px;text-align:center;color:var(--text3);font-size:13px}
+
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border-mid);border-radius:99px}
+</style>
+</head>
+<body>
+
+<!-- ═══ STICKY CHROME — everything sticky together ═══ -->
+<div class="sticky-chrome">
+
+  <!-- TICKER -->
+  <div class="ticker"><div class="ticker-inner" id="ticker"></div></div>
+
+  <!-- HEADER -->
+  <header class="hdr">
+    <div class="hdr-top">
+      <div class="hdr-brand">
+        <svg width="20" height="26" viewBox="0 0 20 26" fill="none">
+          <line x1="3" y1="2" x2="3" y2="24" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+          <polygon points="4,2 18,8 4,14" fill="#d4aa4a"/>
+        </svg>
+        <div><div class="brand-name">Tiger 5</div><div class="brand-tag">Round Tracker</div></div>
+      </div>
+      <!-- Desktop nav lives in header -->
+      <nav class="desktop-nav">
+        <button class="dnav-btn active" onclick="switchTab('overview',this)">Overview</button>
+        <button class="dnav-btn" onclick="switchTab('errors',this)">Errors</button>
+        <button class="dnav-btn" onclick="switchTab('gir',this)">GIR</button>
+        <button class="dnav-btn" onclick="switchTab('rounds',this)">Scorecard</button>
+        <button class="dnav-btn" onclick="switchTab('monthly',this)">Monthly</button>
+      </nav>
+      <div class="hdr-right">
+        <div class="live-badge"><span class="live-dot"></span><span id="upd">Loading…</span></div>
+        <button class="btn-refresh" onclick="loadData()">↻</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MOBILE NAV — directly under header, hidden on desktop -->
+  <nav class="mobile-nav" id="mobile-nav">
+    <button class="mnav-btn active" onclick="switchTab('overview',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+      Overview
+    </button>
+    <button class="mnav-btn" onclick="switchTab('errors',this)">
+      <svg viewBox="0 0 24 24"><path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+      Errors
+    </button>
+    <button class="mnav-btn" onclick="switchTab('gir',this)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l5 3"/></svg>
+      GIR
+    </button>
+    <button class="mnav-btn" onclick="switchTab('rounds',this)">
+      <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      Scores
+    </button>
+    <button class="mnav-btn" onclick="switchTab('monthly',this)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      Monthly
+    </button>
+  </nav>
+
+  <!-- GLOBAL FILTER BAR -->
+  <div class="gfilter">
+    <div class="gfilter-row">
+      <div class="gf-group">
+        <div class="gf-label">Year</div>
+        <select class="gf-select" id="gf-year" onchange="onGlobalFilter()"><option value="">All years</option></select>
+      </div>
+      <div class="gf-group">
+        <div class="gf-label">Month</div>
+        <select class="gf-select" id="gf-month" onchange="onGlobalFilter()">
+          <option value="">All months</option>
+          <option value="01">Jan</option><option value="02">Feb</option><option value="03">Mar</option>
+          <option value="04">Apr</option><option value="05">May</option><option value="06">Jun</option>
+          <option value="07">Jul</option><option value="08">Aug</option><option value="09">Sep</option>
+          <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+        </select>
+      </div>
+      <div class="gf-group">
+        <div class="gf-label">Course</div>
+        <select class="gf-select" id="gf-course" onchange="onGlobalFilter()"><option value="">All courses</option></select>
+      </div>
+      <button class="gf-clear hidden" id="gf-clear" onclick="clearGlobalFilters()">✕ Clear</button>
+    </div>
+    <div class="filter-chips" id="gf-chips"></div>
+  </div>
+
+</div><!-- end .sticky-chrome -->
+
+<!-- ═══ TAB CONTENT ═══ -->
+
+<!-- OVERVIEW (includes hero) -->
+<div class="tab-panel active" id="tab-overview">
+  <div class="hero">
+    <div class="hero-lbl" id="hero-context">Season at a Glance</div>
+    <div class="hero-grid">
+      <div class="hcell"><div class="hcell-lbl">Rounds</div><div class="hcell-val" id="h-rounds">—</div><div class="hcell-sub">played</div></div>
+      <div class="hcell accent"><div class="hcell-lbl">Avg Score</div><div class="hcell-val" id="h-avg">—</div><div class="hcell-sub">overall</div></div>
+      <div class="hcell gold"><div class="hcell-lbl">Best</div><div class="hcell-val" id="h-best">—</div><div class="hcell-sub" id="h-best-sub">career low</div></div>
+      <div class="hcell"><div class="hcell-lbl">Last 10</div><div class="hcell-val" id="h-recent">—</div><div class="hcell-sub" id="h-trend">avg</div></div>
+      <div class="hcell"><div class="hcell-lbl">GIR</div><div class="hcell-val" id="h-gir">—</div><div class="hcell-sub">greens</div></div>
+      <div class="hcell"><div class="hcell-lbl">Errors</div><div class="hcell-val" id="h-err">—</div><div class="hcell-sub">per round</div></div>
+    </div>
+  </div>
+  <div class="content">
+    <div id="loading" class="loading"><div class="spinner"></div><div class="load-txt">Loading data…</div></div>
+    <div id="err-banner"></div>
+    <div id="ov-inner">
+      <div class="cards-grid">
+        <div class="card gc" id="ov-c1"><div class="card-label">Avg Score</div><div class="card-value">—</div><div class="card-sub">—</div></div>
+        <div class="card gd" id="ov-c2"><div class="card-label">Best Round</div><div class="card-value">—</div><div class="card-sub">—</div></div>
+        <div class="card gc" id="ov-c3"><div class="card-label">Sub-80 Rounds</div><div class="card-value">—</div><div class="card-sub">—</div></div>
+        <div class="card gc" id="ov-c4"><div class="card-label">Avg FIR</div><div class="card-value">—</div><div class="card-sub">fairways</div></div>
+      </div>
+      <div class="ch2">
+        <div class="cw"><div class="ct">Score Trend · 10-Round Moving Avg</div><div style="position:relative;height:210px"><canvas id="ch-score" role="img" aria-label="Score trend">Score trend.</canvas></div></div>
+        <div class="cw"><div class="ct">Errors vs Score · Correlation</div><div style="position:relative;height:210px"><canvas id="ch-scatter" role="img" aria-label="Errors vs score">Errors vs score.</canvas></div></div>
+      </div>
+      <div class="sec"><div class="sec-title">Key Insights</div><div class="sec-rule"></div></div>
+      <div class="ig" id="ov-ins"></div>
+      <div class="sec" style="margin-top:4px"><div class="sec-title">Course Intel</div><div class="sec-rule"></div></div>
+      <div class="course-grid" id="course-stat-cards"></div>
+      <div class="cw">
+        <div class="ct">Top Courses · Avg Score &amp; Rounds</div>
+        <div class="tw" style="border:none;box-shadow:none;margin-bottom:0;border-radius:0">
+          <table class="ctbl">
+            <thead><tr>
+              <th style="width:28px"></th><th>Course</th>
+              <th class="r">Rounds</th><th class="r">Avg Score</th>
+              <th class="r">Best</th><th class="r">Avg GIR</th><th class="r">Avg Errors</th>
+            </tr></thead>
+            <tbody id="course-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ERRORS -->
+<div class="tab-panel" id="tab-errors">
+  <div class="content">
+    <div class="cards-grid wide" id="err-cards"></div>
+    <div class="ch2">
+      <div class="cw"><div class="ct">Avg Errors per Round</div><div style="position:relative;height:240px"><canvas id="ch-err-bar" role="img" aria-label="Errors per round">Errors per round.</canvas></div></div>
+      <div class="cw"><div class="ct">Avg Score by Error Count</div><div style="position:relative;height:240px"><canvas id="ch-bucket" role="img" aria-label="Score by error bucket">Score by error bucket.</canvas></div></div>
+    </div>
+    <div class="cw"><div class="ct">Correlation to Score · r value</div><div class="ebars" id="corr-bars"></div></div>
+    <div class="cw" style="margin-top:0">
+      <div class="ct">Errors Over Time · Stacked</div>
+      <div class="lgnd" id="err-lgnd"></div>
+      <div style="position:relative;height:210px"><canvas id="ch-err-time" role="img" aria-label="Errors over time">Errors over time.</canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- GIR -->
+<div class="tab-panel" id="tab-gir">
+  <div class="content">
+    <div class="gg" id="gir-cards"></div>
+    <div class="ch2">
+      <div class="cw"><div class="ct">GIR Miss Attribution · <span id="gir-n">—</span> rounds</div><div style="position:relative;height:250px"><canvas id="ch-gir-pie" role="img" aria-label="GIR attribution">GIR attribution.</canvas></div></div>
+      <div class="cw"><div class="ct">GIR % Per Round Over Time</div><div style="position:relative;height:250px"><canvas id="ch-gir-trend" role="img" aria-label="GIR trend">GIR trend.</canvas></div></div>
+    </div>
+    <div class="sec"><div class="sec-title">GIR Insights</div><div class="sec-rule"></div></div>
+    <div class="ig" id="gir-ins"></div>
+  </div>
+</div>
+
+<!-- SCORECARD -->
+<div class="tab-panel" id="tab-rounds">
+  <div class="content">
+    <div class="sec"><div class="sec-title">Scorecard</div><div class="sec-rule"></div><div class="sec-badge" id="rds-badge">—</div></div>
+    <div class="lfilter">
+      <div class="lf-row">
+        <div class="lf-group">
+          <div class="lf-label">Walk / Ride</div>
+          <select class="lf-select" id="lf-wr" onchange="renderRounds()">
+            <option value="">All</option><option value="Walking">Walking</option><option value="Cart">Cart</option>
+          </select>
+        </div>
+        <div class="lf-group">
+          <div class="lf-label">Errors ≤</div>
+          <select class="lf-select" id="lf-err" onchange="renderRounds()">
+            <option value="">Any</option>
+            <option value="6">Clean (≤6)</option><option value="9">Good (≤9)</option><option value="12">Avg (≤12)</option>
+          </select>
+        </div>
+        <div class="lf-group" style="min-width:160px">
+          <div class="lf-label">Score range</div>
+          <div class="range-row">
+            <input type="range" class="range-input" id="lf-smin" min="70" max="100" value="70" step="1" oninput="syncRange();renderRounds()">
+            <span class="rval" id="lf-smin-lbl">70</span>
+            <span style="font-size:10px;color:var(--text3)">–</span>
+            <input type="range" class="range-input" id="lf-smax" min="70" max="100" value="100" step="1" oninput="syncRange();renderRounds()">
+            <span class="rval" id="lf-smax-lbl">100</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tw">
+      <table class="tbl">
+        <thead><tr>
+          <th>Date</th><th>Course</th>
+          <th class="r">Score</th><th class="r">+/-</th><th class="r">HCP</th>
+          <th class="r">Errors</th><th class="r">DB+</th><th class="r">3-Putt</th>
+          <th class="r">Par5</th><th class="r">2-Chip</th><th class="r">&lt;130</th>
+          <th class="r">Putts</th><th class="r">GIR</th><th class="r">FIR</th>
+          <th class="r">Rating</th><th class="r">Slope</th><th class="r">Yds</th>
+          <th class="r">Cost</th><th>Walk/Ride</th>
+        </tr></thead>
+        <tbody id="rounds-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- MONTHLY -->
+<div class="tab-panel" id="tab-monthly">
+  <div class="content">
+    <div class="sec"><div class="sec-title">Monthly Performance</div><div class="sec-rule"></div></div>
+    <div class="mg" id="month-grid"></div>
+    <div class="mo-stat-grid" id="mo-stat-cards"></div>
+    <div class="cw"><div class="ct">Monthly Average Score</div><div style="position:relative;height:220px"><canvas id="ch-monthly" role="img" aria-label="Monthly scores">Monthly scores.</canvas></div></div>
+    <div class="ch2" style="margin-top:0">
+      <div class="cw"><div class="ct">Avg Errors &amp; HCP Differential</div><div style="position:relative;height:210px"><canvas id="ch-mo-err" role="img" aria-label="Monthly errors vs HCP">Monthly errors vs HCP.</canvas></div></div>
+      <div class="cw"><div class="ct">Monthly Spend</div><div style="position:relative;height:210px"><canvas id="ch-mo-cost" role="img" aria-label="Monthly cost">Monthly cost.</canvas></div></div>
+    </div>
+    <div class="ch2" style="margin-top:0">
+      <div class="cw"><div class="ct">Walk vs Cart per Month</div><div style="position:relative;height:210px"><canvas id="ch-mo-wr" role="img" aria-label="Walk vs cart">Walk vs cart.</canvas></div></div>
+      <div class="cw"><div class="ct">Rounds per Month</div><div style="position:relative;height:210px"><canvas id="ch-mo-ct" role="img" aria-label="Rounds per month">Rounds per month.</canvas></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CSV_URL='https://docs.google.com/spreadsheets/d/e/2PACX-1vSjYnVI-lwlNY4cddjP3bkJwR1CyNgQxcePo_vJp24q4TYMyfmHXhvZbjowUtLDcWgfWm-wrSmNYuJi/pub?gid=0&single=true&output=csv';
+const ERRS=[
+  {key:'Double Bogey +',label:'Double Bogey+',short:'DB+',color:'#c0392b'},
+  {key:'3 Putts',label:'3-Putts',short:'3P',color:'#7b2d8b'},
+  {key:'Bogey+ Par 5s',label:'Bogey Par 5s',short:'P5',color:'#c8740a'},
+  {key:'2 Chips',label:'2-Chip',short:'2C',color:'#1a6ea8'},
+  {key:'Bogey under 130yds',label:'<130 yds',short:'<130',color:'#1e7a4a'},
+];
+const GN='#1e5c3a',GOLD='#b8922a',RED='#c0392b',AMBER='#c8740a',BLUE='#1a6ea8';
+const GRID='rgba(0,0,0,0.05)',MUT='#7a9088';
+const MNAMES=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+let allData=[],charts={};
+
+Chart.defaults.font.family="'DM Sans',system-ui,sans-serif";
+Chart.defaults.font.size=11;
+Chart.defaults.color=MUT;
+const ax=()=>({grid:{color:GRID,drawBorder:false},ticks:{color:MUT,font:{size:10}},border:{display:false}});
+const tt=()=>({backgroundColor:'#fff',borderColor:'rgba(0,0,0,0.1)',borderWidth:1,titleColor:'#111c16',bodyColor:'#3d5248',padding:10,cornerRadius:8,titleFont:{family:"'DM Sans'",size:11,weight:'700'},bodyFont:{family:"'DM Sans'",size:11}});
+const dc=id=>{if(charts[id]){charts[id].destroy();delete charts[id];}};
+const el=id=>document.getElementById(id);
+const avg=(arr,k)=>{const v=arr.map(r=>r[k]).filter(x=>x!=null&&!isNaN(x));return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;};
+const f=(n,d=1)=>n==null?'—':(Math.round(+n*Math.pow(10,d))/Math.pow(10,d)).toFixed(d);
+const movAvg=(arr,n)=>arr.map((_,i)=>{if(i<n-1)return null;const s=arr.slice(i-n+1,i+1);return s.reduce((a,b)=>a+b,0)/n;});
+const nn=v=>{const n=parseFloat(v);return isNaN(n)?null:n;};
+const shortCourse=c=>c.split('|')[0].trim().split(' ').slice(0,3).join(' ');
+
+function fmtDate(iso){const dt=new Date(iso+'T12:00:00');return isNaN(dt)?iso.slice(5):dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+function fmtDateLong(iso){const dt=new Date(iso+'T12:00:00');return isNaN(dt)?iso:dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+
+function parseDate(raw){
+  if(!raw) return '';
+  raw=raw.toString().trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0,10);
+  const m=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(m){let[,mo,d,y]=m;if(y.length===2)y='20'+y;return`${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;}
+  const dt=new Date(raw);
+  if(!isNaN(dt)){return`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;}
+  return '';
+}
+
+// ── GLOBAL FILTERS ────────────────────────────────────────────────────────────
+const GF={year:'',month:'',course:''};
+function getView(){
+  return allData.filter(r=>{
+    if(GF.year   && !r.Date.startsWith(GF.year)) return false;
+    if(GF.month  && r.Date.slice(5,7)!==GF.month) return false;
+    if(GF.course && r.Course!==GF.course) return false;
+    return true;
+  });
+}
+function onGlobalFilter(){
+  GF.year=el('gf-year').value;GF.month=el('gf-month').value;GF.course=el('gf-course').value;
+  ['gf-year','gf-month','gf-course'].forEach(id=>el(id).classList.toggle('gf-active',el(id).value!==''));
+  el('gf-clear').classList.toggle('hidden',!(GF.year||GF.month||GF.course));
+  buildGFChips();renderView();
+}
+function clearGlobalFilters(){
+  GF.year=GF.month=GF.course='';
+  ['gf-year','gf-month','gf-course'].forEach(id=>{el(id).value='';el(id).classList.remove('gf-active');});
+  el('gf-clear').classList.add('hidden');
+  el('gf-chips').innerHTML='';
+  renderView();
+}
+function buildGFChips(){
+  const chips=[];
+  if(GF.year)   chips.push({l:'Year: '+GF.year,   cb:"GF.year='';el('gf-year').value='';el('gf-year').classList.remove('gf-active');onGlobalFilter()"});
+  if(GF.month)  chips.push({l:MNAMES[parseInt(GF.month)-1], cb:"GF.month='';el('gf-month').value='';el('gf-month').classList.remove('gf-active');onGlobalFilter()"});
+  if(GF.course) chips.push({l:shortCourse(GF.course), cb:"GF.course='';el('gf-course').value='';el('gf-course').classList.remove('gf-active');onGlobalFilter()"});
+  el('gf-chips').innerHTML=chips.map(c=>`<div class="fchip">${c.l}<button class="fchip-x" onclick="${c.cb}">✕</button></div>`).join('');
+}
+function heroContext(){
+  const p=[];if(GF.year)p.push(GF.year);if(GF.month)p.push(MNAMES[parseInt(GF.month)-1]);if(GF.course)p.push(shortCourse(GF.course));
+  el('hero-context').textContent=p.length?p.join(' · '):'Season at a Glance';
+}
+
+// ── CSV PARSE ─────────────────────────────────────────────────────────────────
+function parseCSV(text){
+  const rows=Papa.parse(text,{header:false,skipEmptyLines:true}).data;
+  let hi=-1;
+  for(let i=0;i<Math.min(12,rows.length);i++){
+    if(rows[i].some(c=>c.toString().trim().toLowerCase()==='date')&&rows[i].some(c=>c.toString().trim().toLowerCase()==='score')){hi=i;break;}
+  }
+  if(hi<0)throw new Error('Header row not found');
+  const headers=rows[hi].map(h=>h.toString().trim());
+  return rows.slice(hi+1)
+    .map(row=>{const o={};headers.forEach((h,i)=>{o[h]=row[i]!==undefined?row[i].toString().trim():'';});return o;})
+    .filter(r=>{const d=parseDate(r['Date']);const s=parseFloat(r['Score']);return d&&!isNaN(s)&&s>50&&s<130;})
+    .map(r=>({
+      Date:parseDate(r['Date']),Course:r['Course']||'',Tee:r['Tee']||'',
+      Slope:nn(r['Slope']),Yards:nn(r['Yards']),Par:nn(r['Par'])||72,
+      Score:nn(r['Score']),HCP:nn(r['HCP Differential']),
+      Errors:nn(r['Total Errors']),DB:nn(r['Double Bogey +']),
+      Putts3:nn(r['3 Putts']),Par5:nn(r['Bogey+ Par 5s']),
+      Chips:nn(r['2 Chips']),W130:nn(r['Bogey under 130yds']),
+      Putts:nn(r['Putts']),GIR:nn(r['GIR']),FIR:nn(r['FIR']),
+      Rating:nn(r['Rating']),Cost:r['Cost']||'',WalkRide:r['Walk/Ride']||'',
+      Driver:r['Driver']!==''?nn(r['Driver']):null,
+      Iron:r['Iron']!==''?nn(r['Iron']):null,
+      Wedge:r['Wedge']!==''?nn(r['Wedge']):null,
+      'Double Bogey +':nn(r['Double Bogey +']),
+      '3 Putts':nn(r['3 Putts']),'Bogey+ Par 5s':nn(r['Bogey+ Par 5s']),
+      '2 Chips':nn(r['2 Chips']),'Bogey under 130yds':nn(r['Bogey under 130yds']),
+    }))
+    .sort((a,b)=>a.Date.localeCompare(b.Date));
+}
+
+// ── LOAD ──────────────────────────────────────────────────────────────────────
+async function loadData(){
+  el('loading').style.display='flex';el('err-banner').innerHTML='';
+  try{
+    const r=await fetch(CSV_URL+'&_='+Date.now());
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    const txt=await r.text();
+    if(!txt||txt.length<100)throw new Error('Empty response');
+    allData=parseCSV(txt);
+    if(!allData.length)throw new Error('No valid rounds found — is the sheet published as CSV?');
+    el('upd').textContent=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    populateDropdowns();initScoreRange();renderView();
+  }catch(e){
+    el('err-banner').innerHTML=`<div class="err-card">⚠ ${e.message}<small>File → Share → Publish to web → Sheet "Data" → CSV format</small></div>`;
+    if(allData.length)renderView();
+  }finally{el('loading').style.display='none';}
+}
+
+function populateDropdowns(){
+  const years=[...new Set(allData.map(r=>r.Date.slice(0,4)).filter(Boolean))].sort((a,b)=>b-a);
+  el('gf-year').innerHTML='<option value="">All years</option>'+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  const courses=[...new Set(allData.map(r=>r.Course).filter(Boolean))].sort();
+  el('gf-course').innerHTML='<option value="">All courses</option>'+courses.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+function initScoreRange(){
+  const scores=allData.map(r=>r.Score);
+  const mn=Math.floor(Math.min(...scores)),mx=Math.ceil(Math.max(...scores));
+  ['lf-smin','lf-smax'].forEach(id=>{el(id).min=mn;el(id).max=mx;});
+  el('lf-smin').value=mn;el('lf-smax').value=mx;syncRange();
+}
+function syncRange(){
+  const mn=parseInt(el('lf-smin').value),mx=parseInt(el('lf-smax').value);
+  if(mn>mx){el('lf-smin').value=mx;el('lf-smax').value=mn;return;}
+  el('lf-smin-lbl').textContent=mn;el('lf-smax-lbl').textContent=mx;
+}
+
+// ── RENDER VIEW ───────────────────────────────────────────────────────────────
+function renderView(){
+  const d=getView();
+  heroContext();updateHero(d);buildTicker(d);
+  renderOverview(d);renderErrors(d);renderGIR(d);renderRounds();renderMonthly(d);
+}
+
+// ── HERO ──────────────────────────────────────────────────────────────────────
+function updateHero(d){
+  if(!d.length){['h-rounds','h-avg','h-best','h-gir','h-err','h-recent'].forEach(id=>el(id).textContent='—');return;}
+  const scores=d.map(r=>r.Score);
+  const avgSc=avg(d,'Score'),best=Math.min(...scores);
+  const bestR=d.find(r=>r.Score===best);
+  const recAvg=avg(d.slice(-10),'Score');
+  const girD=d.filter(r=>r.GIR!=null&&r.GIR<=1);
+  el('h-rounds').textContent=d.length;
+  el('h-avg').textContent=f(avgSc);
+  el('h-best').textContent=best;
+  el('h-best-sub').textContent=bestR?shortCourse(bestR.Course):'—';
+  el('h-recent').textContent=f(recAvg);
+  el('h-trend').textContent=recAvg<avgSc?'↓ improving':'↑ vs avg';
+  el('h-gir').textContent=girD.length?Math.round(avg(girD,'GIR')*100)+'%':'—';
+  el('h-err').textContent=f(avg(d,'Errors'));
+}
+
+// ── TICKER ────────────────────────────────────────────────────────────────────
+function buildTicker(d){
+  const sorted=[...d].sort((a,b)=>b.Date.localeCompare(a.Date)).slice(0,25);
+  const items=sorted.map(r=>{
+    const diff=r.Score-r.Par;
+    const ps=diff>0?'+'+diff:diff===0?'E':String(diff);
+    const sc=diff<=-2?'#ff9999':diff<0?'#ffcc77':diff===0?'#aad8aa':'rgba(255,255,255,0.65)';
+    const pb=diff<0?'rgba(255,100,80,0.18)':diff===0?'rgba(180,220,180,0.12)':'rgba(255,255,255,0.06)';
+    return`<div class="t-item"><span class="t-course">${shortCourse(r.Course)}</span><span class="t-score" style="color:${sc}">${r.Score}</span><span class="t-par" style="color:${sc};background:${pb}">${ps}</span><span class="t-date">${fmtDate(r.Date)}</span></div>`;
+  }).join('');
+  el('ticker').innerHTML=items+items;
+}
+
+// ── OVERVIEW ──────────────────────────────────────────────────────────────────
+function renderOverview(d){
+  if(!d.length)return;
+  const avgSc=avg(d,'Score'),scores=d.map(r=>r.Score);
+  const best=Math.min(...scores),bestR=d.find(r=>r.Score===best);
+  const sub80=d.filter(r=>r.Score<80).length;
+  const firD=d.filter(r=>r.FIR!=null&&r.FIR<=1);
+  setCard('ov-c1','Avg Score',f(avgSc),`${d.length} rounds`);
+  setCard('ov-c2','Best Round',best,shortCourse(bestR?.Course||''));
+  setCard('ov-c3','Sub-80',sub80,`${f((sub80/d.length)*100,0)}% of rounds`);
+  setCard('ov-c4','Avg FIR',Math.round(avg(firD,'FIR')*100)+'%','fairways in reg');
+
+  dc('score');
+  const ma=movAvg(d.map(r=>r.Score),10);
+  charts['score']=new Chart(el('ch-score'),{type:'line',
+    data:{labels:d.map(r=>fmtDate(r.Date)),datasets:[
+      {label:'Score',data:d.map(r=>r.Score),borderColor:'rgba(30,92,58,0.45)',borderWidth:1.5,pointRadius:2.5,pointBackgroundColor:GN,tension:0.2,fill:false},
+      {label:'10-Rd Avg',data:ma,borderColor:GOLD,borderWidth:2.5,pointRadius:0,tension:0.3,fill:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{title:i=>d[i[0].dataIndex]?.Course||'',label:c=>`Score: ${c.raw}`},...tt()}},
+      scales:{x:{...ax(),ticks:{...ax().ticks,maxTicksLimit:10,maxRotation:45}},y:{...ax(),min:75,max:100}}}
+  });
+
+  dc('scatter');
+  charts['scatter']=new Chart(el('ch-scatter'),{type:'scatter',
+    data:{datasets:[{data:d.map(r=>({x:r.Errors||0,y:r.Score})),backgroundColor:'rgba(30,92,58,0.3)',pointRadius:5,pointBorderColor:GN,pointBorderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`Score: ${c.raw.y}, Errors: ${c.raw.x}`},...tt()}},
+      scales:{x:{...ax(),title:{display:true,text:'Total Errors',color:MUT,font:{size:10}}},y:{...ax(),min:75,max:100,title:{display:true,text:'Score',color:MUT,font:{size:10}}}}}
+  });
+
+  el('ov-ins').innerHTML=[
+    {t:'Double bogeys are the #1 issue',b:`Avg ${f(avg(d,'DB'))}/round — r=0.71 correlation to score. Cut 1 double bogey per round and save ~1.7 strokes.`,cls:'bad'},
+    {t:'Iron approach shots drive GIR misses',b:'Iron shots cause ~58% of missed greens — nearly 3× more than driver or wedge errors. Distance control is key.',cls:''},
+    {t:`Last 10 rounds avg ${f(avg(d.slice(-10),'Score'))}`,b:`${avg(d.slice(-10),'Score')<avgSc?'Score is trending lower — positive direction.':'Holding steady. Focus on eliminating double bogeys.'}`,cls:'good'},
+    {t:'Short game <130 yds shows low correlation',b:`Bogey <130 yds avg ${f(avg(d,'W130'))}/round but r=0.15 to score — inconsistent rather than systematic.`,cls:'warn'},
+  ].map(({t,b,cls})=>`<div class="ins ${cls}"><div class="ins-t">${t}</div><div class="ins-b">${b}</div></div>`).join('');
+
+  // Course intel
+  const cm={};
+  d.forEach(r=>{if(!r.Course)return;if(!cm[r.Course])cm[r.Course]=[];cm[r.Course].push(r);});
+  const cl=Object.entries(cm).map(([name,rs])=>({
+    name,n:rs.length,avgSc:avg(rs,'Score'),best:Math.min(...rs.map(r=>r.Score)),
+    avgGir:avg(rs.filter(r=>r.GIR!=null&&r.GIR<=1),'GIR'),avgErr:avg(rs,'Errors'),
+  })).sort((a,b)=>b.n-a.n);
+  const mp=cl[0];
+  const ba=[...cl].filter(c=>c.n>=3).sort((a,b)=>a.avgSc-b.avgSc)[0];
+  const br=[...cl].sort((a,b)=>a.best-b.best)[0];
+  el('course-stat-cards').innerHTML=[
+    {l:'Courses Played',v:cl.length,s:'unique venues',cls:'gc'},
+    {l:'Most Played',v:mp?shortCourse(mp.name):'—',s:mp?`${mp.n} rounds`:'',cls:'gc'},
+    {l:'Best Avg Score',v:ba?f(ba.avgSc):'—',s:ba?shortCourse(ba.name):'min 3 rounds',cls:'gd'},
+    {l:'Best Single Round',v:br?br.best:'—',s:br?shortCourse(br.name):'',cls:'gd'},
+  ].map(({l,v,s,cls})=>`<div class="card ${cls}"><div class="card-label">${l}</div><div class="card-value">${v}</div><div class="card-sub">${s}</div></div>`).join('');
+  el('course-tbody').innerHTML=cl.slice(0,10).map((c,i)=>`<tr>
+    <td><span class="rank-num">${i+1}</span></td>
+    <td class="cname">${c.name}</td>
+    <td class="r">${c.n}</td>
+    <td class="r" style="font-weight:700;color:${c.avgSc<83?GN:c.avgSc<87?AMBER:RED}">${f(c.avgSc)}</td>
+    <td class="r" style="color:${GN};font-weight:700">${c.best}</td>
+    <td class="r">${c.avgGir>0?Math.round(c.avgGir*100)+'%':'—'}</td>
+    <td class="r">${f(c.avgErr)}</td>
+  </tr>`).join('');
+}
+function setCard(id,label,value,sub){const c=el(id);c.querySelector('.card-label').textContent=label;c.querySelector('.card-value').textContent=value;c.querySelector('.card-sub').textContent=sub;}
+
+// ── ERRORS ────────────────────────────────────────────────────────────────────
+function renderErrors(d){
+  const avgs=ERRS.map(e=>({...e,avg:avg(d,e.key),total:d.reduce((s,r)=>s+(r[e.key]||0),0)}));
+  el('err-cards').innerHTML=avgs.map(e=>`<div class="card" style="border-top:3px solid ${e.color}"><div class="card-label">${e.label}</div><div class="card-value" style="color:${e.color}">${f(e.avg)}</div><div class="card-sub">${Math.round(e.total)} total</div></div>`).join('');
+  dc('err-bar');
+  charts['err-bar']=new Chart(el('ch-err-bar'),{type:'bar',data:{labels:avgs.map(e=>e.label),datasets:[{data:avgs.map(e=>+f(e.avg)),backgroundColor:avgs.map(e=>e.color),borderRadius:6}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt()}},scales:{x:{...ax()},y:{...ax()}}}});
+  const bkts=[{l:'0–6',min:0,max:6},{l:'7–9',min:7,max:9},{l:'10–12',min:10,max:12},{l:'13+',min:13,max:99}];
+  const bd=bkts.map(b=>{const s=d.filter(r=>(r.Errors||0)>=b.min&&(r.Errors||0)<=b.max);return{l:b.l,sc:s.length?avg(s,'Score'):0,n:s.length};});
+  dc('bucket');
+  charts['bucket']=new Chart(el('ch-bucket'),{type:'bar',data:{labels:bd.map(b=>b.l),datasets:[{data:bd.map(b=>+f(b.sc)),backgroundColor:['#1e7a4a',GN,AMBER,RED],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:c=>`${bd[c.dataIndex].n} rounds`},...tt()}},scales:{x:{...ax()},y:{...ax(),min:78,max:94}}}});
+  el('corr-bars').innerHTML=[
+    {l:'Double Bogey+',r:0.713,c:RED},{l:'Total Errors',r:0.713,c:'#666'},
+    {l:'Bogey Par 5s',r:0.457,c:AMBER},{l:'2-Chips',r:0.350,c:BLUE},
+    {l:'GIR (inverse)',r:-0.574,c:GN},{l:'Bogey <130 yds',r:0.151,c:'#1e7a4a'},
+    {l:'3-Putts',r:0.096,c:'#7b2d8b'},{l:'FIR (inverse)',r:-0.052,c:MUT},
+  ].map(c=>`<div class="erow"><div class="ename">${c.l}</div><div class="etrack"><div class="efill" style="width:${Math.abs(c.r)*100}%;background:${c.c}"></div></div><div class="ecorr">${c.r>0?'+':''}${c.r.toFixed(3)}</div></div>`).join('');
+  dc('err-time');
+  el('err-lgnd').innerHTML=ERRS.map(e=>`<div class="lg"><div class="lg-dot" style="background:${e.color}"></div>${e.label}</div>`).join('');
+  charts['err-time']=new Chart(el('ch-err-time'),{type:'bar',data:{labels:d.map(r=>fmtDate(r.Date)),datasets:ERRS.map(e=>({label:e.label,data:d.map(r=>r[e.key]||0),backgroundColor:e.color,stack:'a',borderWidth:0}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt()}},scales:{x:{...ax(),ticks:{...ax().ticks,maxTicksLimit:12,maxRotation:45}},y:{...ax()}}}});
+}
+
+// ── GIR ───────────────────────────────────────────────────────────────────────
+function renderGIR(d){
+  const gr=d.filter(r=>r.Driver!=null&&r.Iron!=null&&r.Wedge!=null);
+  const tD=gr.reduce((s,r)=>s+r.Driver,0),tI=gr.reduce((s,r)=>s+r.Iron,0),tW=gr.reduce((s,r)=>s+r.Wedge,0);
+  const tot=tD+tI+tW||1;
+  el('gir-n').textContent=gr.length;
+  const gc=[
+    {lbl:'Iron Misses',val:tI,pct:Math.round(tI/tot*100),per:gr.length?f(tI/gr.length):'—',c:BLUE},
+    {lbl:'Driver Misses',val:tD,pct:Math.round(tD/tot*100),per:gr.length?f(tD/gr.length):'—',c:RED},
+    {lbl:'Wedge Misses',val:tW,pct:Math.round(tW/tot*100),per:gr.length?f(tW/gr.length):'—',c:GN},
+  ];
+  el('gir-cards').innerHTML=gc.map(c=>`<div class="gc-card"><div class="gc-club">${c.lbl}</div><div class="gc-pct" style="color:${c.c}">${c.pct}%</div><div class="gc-det">${Math.round(c.val)} total · ${c.per}/round</div><div class="gc-bar-o"><div class="gc-bar-i" style="width:${c.pct}%;background:${c.c}"></div></div></div>`).join('');
+  dc('gir-pie');
+  charts['gir-pie']=new Chart(el('ch-gir-pie'),{type:'doughnut',data:{labels:['Iron','Driver','Wedge'],datasets:[{data:[tI,tD,tW],backgroundColor:[BLUE,RED,GN],borderWidth:0,hoverBorderWidth:2,hoverBorderColor:'#fff'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:true,position:'bottom',labels:{color:'#3d5248',font:{size:11},padding:14,boxWidth:10,usePointStyle:true}},tooltip:{...tt()}}}});
+  dc('gir-trend');
+  const gv=d.filter(r=>r.GIR!=null&&r.GIR<=1);
+  charts['gir-trend']=new Chart(el('ch-gir-trend'),{type:'line',data:{labels:gv.map(r=>fmtDate(r.Date)),datasets:[{label:'GIR%',data:gv.map(r=>Math.round(r.GIR*100)),borderColor:GN,backgroundColor:'rgba(30,92,58,0.07)',borderWidth:2,pointRadius:2.5,fill:true,tension:0.2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`GIR: ${c.raw}%`},...tt()}},scales:{x:{...ax(),ticks:{...ax().ticks,maxTicksLimit:10,maxRotation:45}},y:{...ax(),min:0,max:80,ticks:{...ax().ticks,callback:v=>v+'%'}}}}});
+  el('gir-ins').innerHTML=[
+    {t:`Iron play causes ${gc[0].pct}% of GIR misses`,b:`Avg ${gc[0].per} iron misses/round. Distance control and approach starting line are the biggest opportunity.`,cls:'bad'},
+    {t:`Driver ${gc[1].pct}% · Wedge ${gc[2].pct}%`,b:'Driver errors force recovery; wedge errors waste good positions. Both worth focused practice.',cls:'warn'},
+    {t:`${gr.length} rounds with full club data`,b:'GIR attribution was added partway through the season — percentages sharpen as more rounds accumulate.',cls:''},
+    {t:'Target: –2 iron misses per round',b:`Dropping from ${gc[0].per} to ${(+gc[0].per-2).toFixed(1)} iron misses/round adds ~2 GIRs — worth ~1.5–2 fewer strokes.`,cls:'good'},
+  ].map(({t,b,cls})=>`<div class="ins ${cls}"><div class="ins-t">${t}</div><div class="ins-b">${b}</div></div>`).join('');
+}
+
+// ── SCORECARD ─────────────────────────────────────────────────────────────────
+function renderRounds(){
+  const base=getView();
+  const wr=el('lf-wr').value,errMax=el('lf-err').value;
+  const sMin=parseInt(el('lf-smin').value),sMax=parseInt(el('lf-smax').value);
+  const gMin=Math.floor(Math.min(...allData.map(r=>r.Score)));
+  const gMax=Math.ceil(Math.max(...allData.map(r=>r.Score)));
+  el('lf-wr').classList.toggle('af',wr!=='');el('lf-err').classList.toggle('af',errMax!=='');
+  const filtered=base.filter(r=>{
+    if(wr&&r.WalkRide!==wr)return false;
+    if(errMax&&(r.Errors||0)>parseInt(errMax))return false;
+    if(sMin>gMin&&r.Score<sMin)return false;
+    if(sMax<gMax&&r.Score>sMax)return false;
+    return true;
+  }).sort((a,b)=>b.Date.localeCompare(a.Date));
+  el('rds-badge').textContent=filtered.length===allData.length?`${filtered.length} rounds`:`${filtered.length} of ${allData.length}`;
+  if(!filtered.length){el('rounds-tbody').innerHTML=`<tr><td colspan="19"><div class="no-res">No rounds match these filters</div></td></tr>`;return;}
+  el('rounds-tbody').innerHTML=filtered.map(r=>{
+    const diff=r.Score-r.Par;
+    const ds=diff>0?'+'+diff:diff===0?'E':String(diff);
+    const sc=r.Score<79?'sc-great':r.Score<83?'sc-good':r.Score<88?'sc-avg':'sc-bad';
+    const ec=(r.Errors||0)>=14?'hi-r':(r.Errors||0)>=11?'hi-a':'';
+    const dc2=(r.DB||0)>=5?'hi-r':(r.DB||0)>=3?'hi-a':'';
+    const gir=r.GIR!=null&&r.GIR<=1?Math.round(r.GIR*100)+'%':'—';
+    const fir=r.FIR!=null&&r.FIR<=1?Math.round(r.FIR*100)+'%':'—';
+    return`<tr><td>${fmtDateLong(r.Date)}</td><td class="dim">${r.Course}</td>
+      <td class="r"><span class="${sc}">${r.Score}</span></td>
+      <td class="r" style="color:${diff<0?RED:diff===0?'#888':'#aaa'}">${ds}</td>
+      <td class="r">${r.HCP!=null?f(r.HCP):'—'}</td>
+      <td class="r ${ec}">${r.Errors!=null?f(r.Errors,1):'—'}</td>
+      <td class="r ${dc2}">${r.DB!=null?r.DB:'—'}</td>
+      <td class="r">${r.Putts3!=null?r.Putts3:'—'}</td>
+      <td class="r">${r.Par5!=null?r.Par5:'—'}</td>
+      <td class="r">${r.Chips!=null?f(r.Chips,1):'—'}</td>
+      <td class="r">${r.W130!=null?r.W130:'—'}</td>
+      <td class="r">${r.Putts!=null?r.Putts:'—'}</td>
+      <td class="r" style="color:${GN}">${gir}</td>
+      <td class="r">${fir}</td>
+      <td class="r">${r.Rating!=null?f(r.Rating,1):'—'}</td>
+      <td class="r">${r.Slope!=null?r.Slope:'—'}</td>
+      <td class="r">${r.Yards!=null?r.Yards.toLocaleString():'—'}</td>
+      <td class="r">${r.Cost||'—'}</td>
+      <td>${r.WalkRide||'—'}</td></tr>`;
+  }).join('');
+}
+
+// ── MONTHLY ───────────────────────────────────────────────────────────────────
+function renderMonthly(d){
+  const mos={};
+  d.forEach(r=>{const m=r.Date.slice(0,7);if(!m||m.length<7)return;if(!mos[m])mos[m]=[];mos[m].push(r);});
+  const keys=Object.keys(mos).filter(k=>k.length===7).sort();
+  if(!keys.length){el('month-grid').innerHTML='<div style="color:var(--text3);font-size:12px;padding:8px">No data</div>';return;}
+  const md=keys.map(k=>{
+    const rs=mos[k],[y,mo]=k.split('-');
+    const lbl=MNAMES[parseInt(mo,10)-1]+' '+y.slice(2);
+    const costNums=rs.map(r=>{const n=parseFloat(r.Cost.toString().replace(/[$,]/g,''));return isNaN(n)?0:n;});
+    const totalCost=costNums.reduce((a,b)=>a+b,0);
+    const walking=rs.filter(r=>r.WalkRide.toLowerCase().includes('walk')).length;
+    const riding=rs.filter(r=>r.WalkRide.toLowerCase().includes('cart')).length;
+    return{k,lbl,sc:avg(rs,'Score'),err:avg(rs,'Errors'),n:rs.length,totalCost,walking,riding,avgHcp:avg(rs,'HCP')};
+  });
+  const totalCost=md.reduce((s,m)=>s+m.totalCost,0);
+  const totalWalk=md.reduce((s,m)=>s+m.walking,0);
+  const totalRide=md.reduce((s,m)=>s+m.riding,0);
+  const totalRds=d.length;
+  el('mo-stat-cards').innerHTML=[
+    {l:'Total Spend',v:'$'+Math.round(totalCost).toLocaleString(),s:`across ${totalRds} rounds`,cls:'gc'},
+    {l:'Cost per Round',v:'$'+f(totalCost/Math.max(totalRds,1),0),s:'avg per round',cls:'gc'},
+    {l:'Walking',v:totalWalk,s:`${totalRide} cart · ${totalWalk+totalRide>0?Math.round(totalWalk/(totalWalk+totalRide)*100):0}% walking`,cls:'gd'},
+    {l:'Avg HCP Diff',v:f(avg(d,'HCP')),s:`avg errors: ${f(avg(d,'Errors'))}`,cls:'gc'},
+  ].map(({l,v,s,cls})=>`<div class="card ${cls}"><div class="card-label">${l}</div><div class="card-value">${v}</div><div class="card-sub">${s}</div></div>`).join('');
+  const cls=s=>s<83?'mca':s<86?'mcb':s<89?'mcc':'mcd';
+  el('month-grid').innerHTML=md.map(m=>`<div class="mc"><div class="mc-mo">${m.lbl}</div><div class="mc-sc ${cls(m.sc)}">${f(m.sc)}</div><div class="mc-ct">${m.n} round${m.n!==1?'s':''}</div></div>`).join('');
+  dc('monthly');
+  charts['monthly']=new Chart(el('ch-monthly'),{type:'bar',data:{labels:md.map(m=>m.lbl),datasets:[{data:md.map(m=>+f(m.sc)),backgroundColor:md.map(m=>m.sc<83?'#1e7a4a':m.sc<86?GN:m.sc<89?GOLD:RED),borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{afterLabel:c=>`${md[c.dataIndex].n} rounds`},...tt()}},scales:{x:{...ax(),ticks:{...ax().ticks,autoSkip:false,maxRotation:55}},y:{...ax(),min:78,max:97}}}});
+  dc('mo-err');
+  charts['mo-err']=new Chart(el('ch-mo-err'),{type:'bar',data:{labels:md.map(m=>m.lbl),datasets:[
+    {label:'Avg Errors',data:md.map(m=>+f(m.err)),backgroundColor:RED+'bb',borderRadius:4,yAxisID:'y'},
+    {label:'Avg HCP Diff',data:md.map(m=>m.avgHcp!=null&&!isNaN(m.avgHcp)?+f(m.avgHcp):null),type:'line',borderColor:BLUE,backgroundColor:'rgba(26,110,168,0.07)',borderWidth:2,pointRadius:4,fill:true,tension:0.3,yAxisID:'y2'},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#3d5248',font:{size:10},boxWidth:10,padding:10}},...tt()},scales:{x:{...ax(),ticks:{...ax().ticks,maxRotation:55}},y:{...ax(),title:{display:true,text:'Errors',color:MUT,font:{size:9}}},y2:{...ax(),position:'right',grid:{display:false},title:{display:true,text:'HCP Diff',color:BLUE,font:{size:9}}}}}});
+  dc('mo-cost');
+  charts['mo-cost']=new Chart(el('ch-mo-cost'),{type:'bar',data:{labels:md.map(m=>m.lbl),datasets:[{label:'Cost',data:md.map(m=>Math.round(m.totalCost)),backgroundColor:GOLD+'bb',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`$${c.raw.toLocaleString()}`},...tt()}},scales:{x:{...ax(),ticks:{...ax().ticks,maxRotation:55}},y:{...ax(),ticks:{...ax().ticks,callback:v=>'$'+v}}}}});
+  dc('mo-wr');
+  charts['mo-wr']=new Chart(el('ch-mo-wr'),{type:'bar',data:{labels:md.map(m=>m.lbl),datasets:[
+    {label:'Walking',data:md.map(m=>m.walking),backgroundColor:GN+'cc',stack:'wr',borderRadius:0},
+    {label:'Cart',data:md.map(m=>m.riding),backgroundColor:AMBER+'cc',stack:'wr',borderRadius:0},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,position:'top',labels:{color:'#3d5248',font:{size:10},boxWidth:10,padding:10}},...tt()},scales:{x:{...ax(),ticks:{...ax().ticks,maxRotation:55}},y:{...ax(),ticks:{...ax().ticks,stepSize:1}}}}});
+  dc('mo-ct');
+  charts['mo-ct']=new Chart(el('ch-mo-ct'),{type:'bar',data:{labels:md.map(m=>m.lbl),datasets:[{data:md.map(m=>m.n),backgroundColor:GN+'88',borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt()}},scales:{x:{...ax(),ticks:{...ax().ticks,maxRotation:55}},y:{...ax(),ticks:{...ax().ticks,stepSize:1}}}}});
+}
+
+// ── TAB SWITCH ────────────────────────────────────────────────────────────────
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  el('tab-'+id).classList.add('active');
+  // Update ALL nav buttons (both desktop and mobile)
+  document.querySelectorAll('.dnav-btn,.mnav-btn').forEach(b=>{
+    b.classList.toggle('active', b.getAttribute('onclick')?.includes("'"+id+"'"));
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+loadData();
+</script>
+</body>
+</html>
