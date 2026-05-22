@@ -30,16 +30,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans
 /* ── STICKY CHROME (ticker + header + top-nav + gfilter all sticky together) ── */
 .sticky-chrome{position:sticky;top:0;z-index:200}
 
-/* ── TICKER ── */
-.ticker{background:var(--g900);overflow:hidden;height:38px;display:flex;align-items:center}
-.ticker-inner{display:flex;align-items:center;width:max-content;animation:scroll 60s linear infinite}
-.ticker-inner:hover{animation-play-state:paused}
-@keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.t-item{display:flex;align-items:center;gap:10px;padding:0 20px;border-right:1px solid rgba(255,255,255,0.08);white-space:nowrap}
-.t-course{font-size:12px;font-weight:700;color:rgba(255,255,255,0.88);max-width:150px;overflow:hidden;text-overflow:ellipsis}
-.t-score{font-size:13px;font-weight:800}
-.t-par{font-size:11px;font-weight:600;padding:1px 7px;border-radius:20px}
-.t-date{font-size:10px;color:rgba(255,255,255,0.3)}
 
 /* ── HEADER ── */
 .hdr{background:var(--g800);padding:0 16px;box-shadow:0 1px 0 rgba(255,255,255,0.06)}
@@ -238,7 +228,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',system-ui,sans
 <!-- ═══ STICKY CHROME — everything sticky together ═══ -->
 <div class="sticky-chrome">
 
-  <!-- TICKER -->
+  
   
 
   <!-- HEADER -->
@@ -632,18 +622,7 @@ function updateHero(d){
   el('h-err').textContent=f(avg(d,'Errors'));
 }
 
-// ── TICKER ────────────────────────────────────────────────────────────────────
-function buildTicker(d){
-  const sorted=[...d].sort((a,b)=>b.Date.localeCompare(a.Date)).slice(0,25);
-  const items=sorted.map(r=>{
-    const diff=r.Score-r.Par;
-    const ps=diff>0?'+'+diff:diff===0?'E':String(diff);
-    const sc=diff<=-2?'#ff9999':diff<0?'#ffcc77':diff===0?'#aad8aa':'rgba(255,255,255,0.65)';
-    const pb=diff<0?'rgba(255,100,80,0.18)':diff===0?'rgba(180,220,180,0.12)':'rgba(255,255,255,0.06)';
-    return`<div class="t-item"><span class="t-course">${shortCourse(r.Course)}</span><span class="t-score" style="color:${sc}">${r.Score}</span><span class="t-par" style="color:${sc};background:${pb}">${ps}</span><span class="t-date">${fmtDate(r.Date)}</span></div>`;
-  }).join('');
-  el('ticker').innerHTML=items+items;
-}
+
 
 // ── OVERVIEW ──────────────────────────────────────────────────────────────────
 function renderOverview(d){
